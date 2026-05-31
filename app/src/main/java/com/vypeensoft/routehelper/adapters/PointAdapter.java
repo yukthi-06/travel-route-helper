@@ -121,11 +121,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
 
         // 4. Re-order the display list: Receding -> Marker -> Approaching
-        // Sort receding by distance descending (furthest first)
-        Collections.sort(receding, (p1, p2) -> Double.compare(getDistanceForPoint(p2, currentDistances), getDistanceForPoint(p1, currentDistances)));
-        // Sort approaching by distance ascending (closest first)
-        Collections.sort(approaching, (p1, p2) -> Double.compare(getDistanceForPoint(p1, currentDistances), getDistanceForPoint(p2, currentDistances)));
-
+        // The original order of the points list should never change, only the current user placement within the list changes.
         neutral.add(currUserPoint);
 
         java.util.List<Point> newOrder = new java.util.ArrayList<>();
