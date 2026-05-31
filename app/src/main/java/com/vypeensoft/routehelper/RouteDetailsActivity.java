@@ -60,6 +60,9 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         fab.setOnClickListener(v -> {
             Intent intent = new Intent(RouteDetailsActivity.this, AddPointActivity.class);
             intent.putExtra("FILE_PATH", filePath);
+            if (adapter != null) {
+                intent.putExtra("USER_ROW_POSITION", adapter.getUserRowPosition());
+            }
             startActivity(intent);
         });
 
