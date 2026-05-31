@@ -46,6 +46,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public PointAdapter(List<Point> pointsOnRoute, OnPointClickListener listener) {
         this.pointsOnRoute = pointsOnRoute;
         this.listener = listener;
+        initializeLinksIfMissing();
     }
 
     public void updateCurrentLocation(Location currLocation) {
@@ -72,13 +73,14 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         // 2. Calculate new current distances
         currentDistances = new java.util.ArrayList<>();
         for (Point onePointOnRoute : pointsOnRoute) {
+            if (onePointOnRoute.getName().equals("----Current User----")) continue;
             float[] results = new float[1];
             Location.distanceBetween(currLocation.getLatitude(), currLocation.getLongitude(), onePointOnRoute.getLatitude(), onePointOnRoute.getLongitude(), results);
             currentDistances.add(new PointWithDistance(onePointOnRoute, results[0]));
         }
         //LogUtil.printList(currentDistances, "PointAdapter.currentDistances");
 
-        // 3. Categorize pointsOnRoute based on movement (compare matching pointsOnRoute by timestamp)
+        // 3. Categorize pointsOnRoute based on movement/doubly linked list
         java.util.List<Point> receding    = new java.util.ArrayList<>();
         java.util.List<Point> approaching = new java.util.ArrayList<>();
         java.util.List<Point> neutral     = new java.util.ArrayList<>();
@@ -86,32 +88,45 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         Point currUserPoint = createCurrentUserPoint(currLocation.getLatitude(), currLocation.getLongitude());
         addCurrentUserPoint(currUserPoint);
 
-        for (Point p : pointsOnRoute) {
-            double currentDist  = getDistanceForPoint(p, currentDistances);
-            double previousDist = getDistanceForPoint(p, previousDistances);
+        List<Point> orderedActive = getOriginalRouteOrder(pointsOnRoute);
+        int M = orderedActive.size();
 
-            if (previousDist != -1 && currentDist != -1) {
-                double diff = currentDist - previousDist;
-                if (diff > JITTER_THRESHOLD_METERS) {
-                    receding.add(p);
-                } else if (diff < -JITTER_THRESHOLD_METERS) {
-                    approaching.add(p);
-                } else {
-                    //neutral.add(p);
-                    receding.add(p);  //treat no change as receding
+        if (M == 1) {
+            receding.add(orderedActive.get(0));
+        } else if (M >= 2) {
+            int minIndex = 0;
+            double minAvgDist = Double.MAX_VALUE;
+            for (int i = 0; i < M - 1; i++) {
+                Point pA = orderedActive.get(i);
+                Point pB = orderedActive.get(i + 1);
+                double distA = getDistanceForPoint(pA, currentDistances);
+                double distB = getDistanceForPoint(pB, currentDistances);
+                if (distA != -1 && distB != -1) {
+                    double avg = (distA + distB) / 2.0;
+                    if (avg < minAvgDist) {
+                        minAvgDist = avg;
+                        minIndex = i;
+                    }
                 }
-            } else {
-                neutral.add(p);
+            }
+
+            // Receding: from 0 up to minIndex
+            for (int i = 0; i <= minIndex; i++) {
+                receding.add(orderedActive.get(i));
+            }
+            // Approaching: from minIndex + 1 to M - 1
+            for (int i = minIndex + 1; i < M; i++) {
+                approaching.add(orderedActive.get(i));
             }
         }
-
-        //neutral.add(currUserPoint);
 
         // 4. Re-order the display list: Receding -> Marker -> Approaching
         // Sort receding by distance descending (furthest first)
         Collections.sort(receding, (p1, p2) -> Double.compare(getDistanceForPoint(p2, currentDistances), getDistanceForPoint(p1, currentDistances)));
         // Sort approaching by distance ascending (closest first)
         Collections.sort(approaching, (p1, p2) -> Double.compare(getDistanceForPoint(p1, currentDistances), getDistanceForPoint(p2, currentDistances)));
+
+        neutral.add(currUserPoint);
 
         java.util.List<Point> newOrder = new java.util.ArrayList<>();
         newOrder.addAll(receding);
@@ -238,7 +253,93 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.pointsOnRoute = pointsOnRoute;
         currentDistances.clear();
         previousDistances.clear();
+        initializeLinksIfMissing();
         notifyDataSetChanged();
+    }
+
+    private void initializeLinksIfMissing() {
+        if (pointsOnRoute == null) return;
+        List<Point> active = new java.util.ArrayList<>();
+        for (Point p : pointsOnRoute) {
+            if (p != null && !p.getName().equals("----Current User----")) {
+                active.add(p);
+            }
+        }
+        
+        // If pointers are already set, we don't overwrite them
+        for (Point p : active) {
+            if (p.getParentId() != null || p.getChildId() != null) {
+                return;
+            }
+        }
+        
+        // Populate parentId and childId using original order
+        for (int i = 0; i < active.size(); i++) {
+            Point current = active.get(i);
+            if (i > 0) {
+                current.setParentId(active.get(i - 1).getPointId());
+            } else {
+                current.setParentId(null);
+            }
+            if (i < active.size() - 1) {
+                current.setChildId(active.get(i + 1).getPointId());
+            } else {
+                current.setChildId(null);
+            }
+        }
+    }
+
+    private List<Point> getOriginalRouteOrder(List<Point> points) {
+        List<Point> active = new java.util.ArrayList<>();
+        for (Point p : points) {
+            if (p != null && !p.getName().equals("----Current User----")) {
+                active.add(p);
+            }
+        }
+        if (active.isEmpty()) return active;
+
+        // Find the head (no parentId)
+        Point head = null;
+        for (Point p : active) {
+            if (p.getParentId() == null || p.getParentId().trim().isEmpty()) {
+                head = p;
+                break;
+            }
+        }
+        
+        if (head == null) {
+            head = active.get(0);
+        }
+
+        List<Point> ordered = new java.util.ArrayList<>();
+        Point current = head;
+        while (current != null) {
+            ordered.add(current);
+            String nextId = current.getChildId();
+            if (nextId == null || nextId.trim().isEmpty()) {
+                break;
+            }
+            Point next = null;
+            for (Point p : active) {
+                if (nextId.equals(p.getPointId())) {
+                    next = p;
+                    break;
+                }
+            }
+            if (next == null || ordered.contains(next)) {
+                break;
+            }
+            current = next;
+        }
+
+        if (ordered.size() < active.size()) {
+            for (Point p : active) {
+                if (!ordered.contains(p)) {
+                    ordered.add(p);
+                }
+            }
+        }
+        return ordered;
     }
 
     static class PointViewHolder extends RecyclerView.ViewHolder {
