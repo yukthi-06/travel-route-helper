@@ -3,8 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/action_edit"
-        android:title="Edit"
+        android:title="Edit Route Points"
         android:icon="@android:drawable/ic_menu_edit"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_reverse"
+        android:title="Reverse Trip Direction"
+        android:icon="@android:drawable/ic_menu_directions"
         app:showAsAction="never" />
     <item
         android:id="@+id/action_done"

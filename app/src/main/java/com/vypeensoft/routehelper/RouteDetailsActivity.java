@@ -28,6 +28,7 @@ import com.vypeensoft.routehelper.utils.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class RouteDetailsActivity extends AppCompatActivity implements PointAdapter.OnPointClickListener {
@@ -205,6 +206,7 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         }
         if (optionsMenu != null) {
             optionsMenu.findItem(R.id.action_edit).setVisible(!editMode);
+            optionsMenu.findItem(R.id.action_reverse).setVisible(!editMode);
             optionsMenu.findItem(R.id.action_done).setVisible(editMode);
             optionsMenu.findItem(R.id.action_cancel).setVisible(editMode);
         }
@@ -238,6 +240,7 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         this.optionsMenu = menu;
         boolean isEdit = adapter != null && adapter.isEditMode();
         menu.findItem(R.id.action_edit).setVisible(!isEdit);
+        menu.findItem(R.id.action_reverse).setVisible(!isEdit);
         menu.findItem(R.id.action_done).setVisible(isEdit);
         menu.findItem(R.id.action_cancel).setVisible(isEdit);
         return true;
@@ -248,6 +251,9 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         int id = item.getItemId();
         if (id == R.id.action_edit) {
             updateEditModeUI(true);
+            return true;
+        } else if (id == R.id.action_reverse) {
+            reverseRouteDirection();
             return true;
         } else if (id == R.id.action_done) {
             saveReorderedPoints();
@@ -270,5 +276,98 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         } else {
             super.onBackPressed();
         }
+    }
+
+    private void reverseRouteDirection() {
+        if (currentRoute == null) return;
+
+        // 1. Reverse active points
+        List<Point> activePoints = new ArrayList<>();
+        List<Point> deletedPoints = new ArrayList<>();
+        for (Point p : currentRoute.getPoints()) {
+            if (p.isDeleted()) {
+                deletedPoints.add(p);
+            } else {
+                activePoints.add(p);
+            }
+        }
+        Collections.reverse(activePoints);
+        List<Point> newPointsList = new ArrayList<>(activePoints);
+        newPointsList.addAll(deletedPoints);
+
+        currentRoute.getPoints().clear();
+        currentRoute.getPoints().addAll(newPointsList);
+
+        // 2. Calculate and set the reversed name
+        String oldName = currentRoute.getRouteName();
+        String newName = getReversedRouteName(oldName);
+        currentRoute.setRouteName(newName);
+
+        // 3. Save new route and delete old files/directories
+        try {
+            File oldFile = new File(filePath);
+
+            // Save new route (updates linked pointers and writes file)
+            FileUtils.saveRoute(this, currentRoute);
+
+            // Delete old json file
+            if (oldFile.exists()) {
+                oldFile.delete();
+            }
+
+            // Delete old folder if empty
+            File oldFolder = oldFile.getParentFile();
+            if (oldFolder != null && oldFolder.exists() && oldFolder.isDirectory()) {
+                File[] remainingFiles = oldFolder.listFiles();
+                if (remainingFiles == null || remainingFiles.length == 0) {
+                    oldFolder.delete();
+                }
+            }
+
+            // 4. Update filePath and refresh UI
+            File routesDir = FileUtils.getRoutesDirectory();
+            File newFolder = new File(routesDir, newName);
+            File newFile = new File(newFolder, newName + ".json");
+            filePath = newFile.getAbsolutePath();
+
+            getSupportActionBar().setTitle(newName);
+            loadRouteData();
+
+            Toast.makeText(this, "Route reversed and renamed to: " + newName, Toast.LENGTH_LONG).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to reverse route: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String getReversedRouteName(String name) {
+        if (name == null) return "";
+        String lower = name.toLowerCase();
+
+        // " to " pattern
+        if (lower.contains(" to ")) {
+            int index = lower.indexOf(" to ");
+            String part1 = name.substring(0, index).trim();
+            String delimiter = name.substring(index, index + 4);
+            String part2 = name.substring(index + 4).trim();
+            return part2 + delimiter + part1;
+        }
+
+        // " - " pattern
+        if (name.contains(" - ")) {
+            String[] parts = name.split(" - ", 2);
+            if (parts.length == 2) {
+                return parts[1].trim() + " - " + parts[0].trim();
+            }
+        }
+
+        // "-" pattern
+        if (name.contains("-")) {
+            String[] parts = name.split("-", 2);
+            if (parts.length == 2) {
+                return parts[1].trim() + "-" + parts[0].trim();
+            }
+        }
+
+        return name + " (Reversed)";
     }
 }

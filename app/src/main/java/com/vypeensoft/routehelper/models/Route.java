@@ -15,6 +15,7 @@ public class Route {
     }
 
     public String getRouteName() { return routeName; }
+    public void setRouteName(String routeName) { this.routeName = routeName; }
     public String getCreatedAt() { return createdAt; }
     public List<Point> getPoints() { return points; }
 
