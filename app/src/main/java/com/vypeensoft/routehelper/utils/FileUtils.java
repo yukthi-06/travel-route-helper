@@ -20,10 +20,11 @@ public class FileUtils {
         File sdcard = Environment.getExternalStorageDirectory();
         File vypeensoftDir = new File(sdcard, "Vypeensoft");
         File appDir = new File(vypeensoftDir, APP_DIR_NAME);
-        if (!appDir.exists()) {
-            appDir.mkdirs();
+        File routesDir = new File(appDir, "routes");
+        if (!routesDir.exists()) {
+            routesDir.mkdirs();
         }
-        return appDir;
+        return routesDir;
     }
 
     public static void saveRoute(Context context, Route route) throws IOException {
