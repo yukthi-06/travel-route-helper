@@ -69,18 +69,20 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         // 1. Snapshot previous distances
         previousDistances = new java.util.ArrayList<>(currentDistances);
         
-        //LogUtil.printList(previousDistances, "PointAdapter.previousDistances");
-        // 2. Calculate new current distances
-        currentDistances = new java.util.ArrayList<>();
-        for (Point onePointOnRoute : pointsOnRoute) {
-            if (onePointOnRoute.getName().equals("----Current User----")) continue;
-            float[] results = new float[1];
-            Location.distanceBetween(currLocation.getLatitude(), currLocation.getLongitude(), onePointOnRoute.getLatitude(), onePointOnRoute.getLongitude(), results);
-            currentDistances.add(new PointWithDistance(onePointOnRoute, results[0]));
-        }
-        //LogUtil.printList(currentDistances, "PointAdapter.currentDistances");
+        // 2. Reconstruct active route points order
+        List<Point> orderedActive = getOriginalRouteOrder(pointsOnRoute);
+        int M = orderedActive.size();
 
-        // 3. Categorize pointsOnRoute based on movement/doubly linked list
+        // 3. Compute direct straight-line distances to each active point
+        double[] directDistances = new double[M];
+        for (int i = 0; i < M; i++) {
+            Point p = orderedActive.get(i);
+            float[] results = new float[1];
+            Location.distanceBetween(currLocation.getLatitude(), currLocation.getLongitude(), p.getLatitude(), p.getLongitude(), results);
+            directDistances[i] = results[0];
+        }
+
+        // 4. Categorize pointsOnRoute based on movement/doubly linked list using direct distances
         java.util.List<Point> receding    = new java.util.ArrayList<>();
         java.util.List<Point> approaching = new java.util.ArrayList<>();
         java.util.List<Point> neutral     = new java.util.ArrayList<>();
@@ -88,25 +90,16 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         Point currUserPoint = createCurrentUserPoint(currLocation.getLatitude(), currLocation.getLongitude());
         addCurrentUserPoint(currUserPoint);
 
-        List<Point> orderedActive = getOriginalRouteOrder(pointsOnRoute);
-        int M = orderedActive.size();
-
+        int minIndex = 0;
         if (M == 1) {
             receding.add(orderedActive.get(0));
         } else if (M >= 2) {
-            int minIndex = 0;
             double minAvgDist = Double.MAX_VALUE;
             for (int i = 0; i < M - 1; i++) {
-                Point pA = orderedActive.get(i);
-                Point pB = orderedActive.get(i + 1);
-                double distA = getDistanceForPoint(pA, currentDistances);
-                double distB = getDistanceForPoint(pB, currentDistances);
-                if (distA != -1 && distB != -1) {
-                    double avg = (distA + distB) / 2.0;
-                    if (avg < minAvgDist) {
-                        minAvgDist = avg;
-                        minIndex = i;
-                    }
+                double avg = (directDistances[i] + directDistances[i + 1]) / 2.0;
+                if (avg < minAvgDist) {
+                    minAvgDist = avg;
+                    minIndex = i;
                 }
             }
 
@@ -120,7 +113,41 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
         }
 
-        // 4. Re-order the display list: Receding -> Marker -> Approaching
+        // 5. Calculate along-the-route distances based on user's specifications
+        currentDistances = new java.util.ArrayList<>();
+        if (M == 1) {
+            currentDistances.add(new PointWithDistance(orderedActive.get(0), (float) directDistances[0]));
+        } else if (M >= 2) {
+            // For receding points: 0 to minIndex
+            double userToNearPassed = directDistances[minIndex]; // dist(User, P_minIndex)
+            for (int j = 0; j <= minIndex; j++) {
+                double pathDist = userToNearPassed;
+                for (int i = j; i < minIndex; i++) {
+                    Point pCurrent = orderedActive.get(i);
+                    Point pNext = orderedActive.get(i + 1);
+                    float[] results = new float[1];
+                    Location.distanceBetween(pCurrent.getLatitude(), pCurrent.getLongitude(), pNext.getLatitude(), pNext.getLongitude(), results);
+                    pathDist += results[0];
+                }
+                currentDistances.add(new PointWithDistance(orderedActive.get(j), (float) pathDist));
+            }
+
+            // For approaching points: minIndex + 1 to M - 1
+            double userToNearAhead = directDistances[minIndex + 1]; // dist(User, P_minIndex+1)
+            for (int j = minIndex + 1; j < M; j++) {
+                double pathDist = userToNearAhead;
+                for (int i = minIndex + 1; i < j; i++) {
+                    Point pCurrent = orderedActive.get(i);
+                    Point pNext = orderedActive.get(i + 1);
+                    float[] results = new float[1];
+                    Location.distanceBetween(pCurrent.getLatitude(), pCurrent.getLongitude(), pNext.getLatitude(), pNext.getLongitude(), results);
+                    pathDist += results[0];
+                }
+                currentDistances.add(new PointWithDistance(orderedActive.get(j), (float) pathDist));
+            }
+        }
+
+        // 6. Re-order the display list: Receding -> Marker -> Approaching
         // The original order of the points list should never change, only the current user placement within the list changes.
         neutral.add(currUserPoint);
 
