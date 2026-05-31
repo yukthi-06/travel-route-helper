@@ -13,6 +13,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -37,6 +38,8 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
     private RecyclerView recyclerView;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
+    private FloatingActionButton fabAddPoint;
+    private android.view.Menu optionsMenu;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,8 +59,8 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         recyclerView = findViewById(R.id.recyclerViewPoints);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        FloatingActionButton fab = findViewById(R.id.fabAddPoint);
-        fab.setOnClickListener(v -> {
+        fabAddPoint = findViewById(R.id.fabAddPoint);
+        fabAddPoint.setOnClickListener(v -> {
             Intent intent = new Intent(RouteDetailsActivity.this, AddPointActivity.class);
             intent.putExtra("FILE_PATH", filePath);
             if (adapter != null) {
@@ -65,6 +68,31 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             }
             startActivity(intent);
         });
+
+        // Set up ItemTouchHelper for drag and drop reordering
+        ItemTouchHelper.SimpleCallback callback = new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return adapter != null && adapter.isEditMode();
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                if (adapter == null) return false;
+                int from = viewHolder.getAdapterPosition();
+                int to = target.getAdapterPosition();
+                adapter.onItemMove(from, to);
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // Swipe disabled
+            }
+        };
+        ItemTouchHelper touchHelper = new ItemTouchHelper(callback);
+        touchHelper.attachToRecyclerView(recyclerView);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         locationCallback = new LocationCallback() {
@@ -162,5 +190,85 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
 
     private void stopLocationUpdates() {
         fusedLocationClient.removeLocationUpdates(locationCallback);
+    }
+
+    private void updateEditModeUI(boolean editMode) {
+        if (adapter != null) {
+            adapter.setEditMode(editMode);
+        }
+        if (fabAddPoint != null) {
+            if (editMode) {
+                fabAddPoint.hide();
+            } else {
+                fabAddPoint.show();
+            }
+        }
+        if (optionsMenu != null) {
+            optionsMenu.findItem(R.id.action_edit).setVisible(!editMode);
+            optionsMenu.findItem(R.id.action_done).setVisible(editMode);
+            optionsMenu.findItem(R.id.action_cancel).setVisible(editMode);
+        }
+    }
+
+    private void saveReorderedPoints() {
+        if (adapter == null || currentRoute == null) return;
+        List<Point> reorderedActive = adapter.getPointsList();
+
+        List<Point> newPointsList = new ArrayList<>(reorderedActive);
+        for (Point p : currentRoute.getPoints()) {
+            if (p.isDeleted()) {
+                newPointsList.add(p);
+            }
+        }
+
+        currentRoute.getPoints().clear();
+        currentRoute.getPoints().addAll(newPointsList);
+
+        try {
+            FileUtils.saveRoute(this, currentRoute);
+            Toast.makeText(this, "Route order saved", Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to save route: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_route_details, menu);
+        this.optionsMenu = menu;
+        boolean isEdit = adapter != null && adapter.isEditMode();
+        menu.findItem(R.id.action_edit).setVisible(!isEdit);
+        menu.findItem(R.id.action_done).setVisible(isEdit);
+        menu.findItem(R.id.action_cancel).setVisible(isEdit);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_edit) {
+            updateEditModeUI(true);
+            return true;
+        } else if (id == R.id.action_done) {
+            saveReorderedPoints();
+            updateEditModeUI(false);
+            loadRouteData();
+            return true;
+        } else if (id == R.id.action_cancel) {
+            updateEditModeUI(false);
+            loadRouteData();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (adapter != null && adapter.isEditMode()) {
+            updateEditModeUI(false);
+            loadRouteData();
+        } else {
+            super.onBackPressed();
+        }
     }
 }

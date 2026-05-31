@@ -4,6 +4,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.vypeensoft.routehelper.R;
@@ -38,6 +39,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private OnPointClickListener listener;
     private Location currentLocation;
     private int userRowPosition = 0;
+    private boolean isEditMode = false;
 
     public interface OnPointClickListener {
         void onPointClick(int position);
@@ -50,6 +52,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     }
 
     public void updateCurrentLocation(Location currLocation) {
+        if (isEditMode) return;
         if (currentLocation != null && currLocation != null) {
             float distanceMoved = currentLocation.distanceTo(currLocation);
             if (distanceMoved < MIN_MOVEMENT_METERS) {
@@ -178,6 +181,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     @Override
     public int getItemViewType(int position) {
+        if (isEditMode) return TYPE_POINT;
         return (position == userRowPosition) ? TYPE_CURRENT_LOCATION : TYPE_POINT;
     }
 
@@ -198,7 +202,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         if (holder instanceof CurrentLocationViewHolder) {
             bindCurrentLocation((CurrentLocationViewHolder) holder);
         } else if (holder instanceof PointViewHolder) {
-            int pointIndex = (position > userRowPosition) ? position - 1 : position;
+            int pointIndex = isEditMode ? position : ((position > userRowPosition) ? position - 1 : position);
             bindPoint((PointViewHolder) holder, pointIndex);
         }
     }
@@ -220,8 +224,8 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         builder.append(point.getName());
         builder.setSpan(new StyleSpan(Typeface.BOLD), startName, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-        double currentDist = getDistanceForPoint(point, currentDistances);
-        double previousDist = getDistanceForPoint(point, previousDistances);
+        double currentDist = isEditMode ? -1 : getDistanceForPoint(point, currentDistances);
+        double previousDist = isEditMode ? -1 : getDistanceForPoint(point, previousDistances);
 
         if (currentDist != -1) {
             String distanceStr;
@@ -254,8 +258,14 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             holder.textViewPointTypes.setVisibility(View.GONE);
         }
 
+        if (isEditMode) {
+            holder.imageViewDragHandle.setVisibility(View.VISIBLE);
+        } else {
+            holder.imageViewDragHandle.setVisibility(View.GONE);
+        }
+
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
+            if (!isEditMode && listener != null) {
                 listener.onPointClick(position);
             }
         });
@@ -263,6 +273,9 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     @Override
     public int getItemCount() {
+        if (isEditMode) {
+            return (pointsOnRoute != null) ? pointsOnRoute.size() : 0;
+        }
         return (pointsOnRoute != null) ? pointsOnRoute.size() + 1 : 1;
     }
 
@@ -270,8 +283,34 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.pointsOnRoute = pointsOnRoute;
         currentDistances.clear();
         previousDistances.clear();
-        initializeLinksIfMissing();
+        if (!isEditMode) {
+            initializeLinksIfMissing();
+        }
         notifyDataSetChanged();
+    }
+
+    public boolean isEditMode() {
+        return isEditMode;
+    }
+
+    public void setEditMode(boolean editMode) {
+        this.isEditMode = editMode;
+        if (editMode) {
+            this.pointsOnRoute = getOriginalRouteOrder(this.pointsOnRoute);
+        }
+        notifyDataSetChanged();
+    }
+
+    public void onItemMove(int fromPosition, int toPosition) {
+        if (pointsOnRoute == null || fromPosition < 0 || fromPosition >= pointsOnRoute.size() || toPosition < 0 || toPosition >= pointsOnRoute.size()) {
+            return;
+        }
+        Collections.swap(pointsOnRoute, fromPosition, toPosition);
+        notifyItemMoved(fromPosition, toPosition);
+    }
+
+    public List<Point> getPointsList() {
+        return pointsOnRoute;
     }
 
     private void initializeLinksIfMissing() {
@@ -361,6 +400,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     static class PointViewHolder extends RecyclerView.ViewHolder {
         TextView textViewPointName, textViewPointLocation, textViewPointTimestamp, textViewPointTypes;
+        ImageView imageViewDragHandle;
 
         PointViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -368,6 +408,7 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             textViewPointLocation = itemView.findViewById(R.id.textViewPointLocation);
             textViewPointTimestamp = itemView.findViewById(R.id.textViewPointTimestamp);
             textViewPointTypes = itemView.findViewById(R.id.textViewPointTypes);
+            imageViewDragHandle = itemView.findViewById(R.id.imageViewDragHandle);
         }
     }
 
