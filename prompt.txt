@@ -1,9 +1,12 @@
 more prompts
 ------------
-In the "About" screen, add build and git version details on the page.
-get details from "X:\Projects_X\0_Active\8_Android_APK\Fake_GPS_Location_APK_GITHUB\app\build.gradle" the below lines
+*	In the "About" screen, add build and git version details on the page.
+	get details from "X:\Projects_X\0_Active\8_Android_APK\Fake_GPS_Location_APK_GITHUB\app\build.gradle" the below lines
 
         buildConfigField "String", "BUILD_TIMESTAMP", "\"${new Date().format('yyyyMMdd.HHmmss')}\""
         buildConfigField "String", "GIT_SHA", "\"${gitSha}\""
         buildConfigField "String", "GIT_SHA_FULL", "\"${gitShaFull}\""
         buildConfigField "String", "GIT_TAG", "\"${gitTag}\""		
+
+
+*	move the project settings and data folder base from /sdcard/Downloads/Travel_Route_Helper to /sdcard/Vypeensoft/Travel_Route_Helper

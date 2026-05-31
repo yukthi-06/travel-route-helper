@@ -13,6 +13,8 @@ public class Point {
     private List<String> types;
 
     private boolean deleted = false;
+    private String parentId;
+    private String childId;
 
     public Point(String name, double latitude, double longitude, String timestamp, List<String> types) {
         this(UUID.randomUUID().toString(), name, latitude, longitude, timestamp, types);
@@ -44,6 +46,12 @@ public class Point {
 
     public boolean isDeleted() { return deleted; }
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
+
+    public String getParentId() { return parentId; }
+    public void setParentId(String parentId) { this.parentId = parentId; }
+
+    public String getChildId() { return childId; }
+    public void setChildId(String childId) { this.childId = childId; }
 
     @Override
     public String toString() {

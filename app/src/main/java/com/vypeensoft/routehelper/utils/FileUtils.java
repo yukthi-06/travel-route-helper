@@ -27,6 +27,9 @@ public class FileUtils {
     }
 
     public static void saveRoute(Context context, Route route) throws IOException {
+        if (route != null) {
+            route.updateLinkedPointers();
+        }
         File routesDir = getRoutesDirectory();
         File routeFolder = new File(routesDir, route.getRouteName());
         if (!routeFolder.exists()) {
@@ -39,9 +42,19 @@ public class FileUtils {
     }
 
     public static Route loadRoute(File file) throws IOException {
+        Route route;
         try (FileReader reader = new FileReader(file)) {
-            return gson.fromJson(reader, Route.class);
+            route = gson.fromJson(reader, Route.class);
         }
+        if (route != null) {
+            boolean changed = route.updateLinkedPointers();
+            if (changed) {
+                try (FileWriter writer = new FileWriter(file)) {
+                    gson.toJson(route, writer);
+                }
+            }
+        }
+        return route;
     }
 
     public static List<File> listRouteFiles(Context context) {
