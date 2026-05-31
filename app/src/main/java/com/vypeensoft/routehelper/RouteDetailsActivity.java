@@ -303,47 +303,93 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         String newName = getReversedRouteName(oldName);
         currentRoute.setRouteName(newName);
 
-        // 3. Save new route and delete old files/directories
+        // 3. Perform atomic file system rename (folder + file)
         try {
             File oldFile = new File(filePath);
-
-            // Save new route (updates linked pointers and writes file)
-            FileUtils.saveRoute(this, currentRoute);
-
-            // Delete old json file
-            if (oldFile.exists()) {
-                oldFile.delete();
-            }
-
-            // Delete old folder if empty
             File oldFolder = oldFile.getParentFile();
-            if (oldFolder != null && oldFolder.exists() && oldFolder.isDirectory()) {
-                File[] remainingFiles = oldFolder.listFiles();
-                if (remainingFiles == null || remainingFiles.length == 0) {
-                    oldFolder.delete();
-                }
-            }
-
-            // 4. Update filePath and refresh UI
             File routesDir = FileUtils.getRoutesDirectory();
             File newFolder = new File(routesDir, newName);
-            File newFile = new File(newFolder, newName + ".json");
-            filePath = newFile.getAbsolutePath();
 
-            getSupportActionBar().setTitle(newName);
-            loadRouteData();
+            // Avoid collision: clean up existing destination folder if it already exists
+            if (newFolder.exists() && !newFolder.equals(oldFolder)) {
+                deleteRecursive(newFolder);
+            }
 
-            Toast.makeText(this, "Route reversed and renamed to: " + newName, Toast.LENGTH_LONG).show();
-        } catch (IOException e) {
-            Toast.makeText(this, "Failed to reverse route: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            // Rename old folder to new folder
+            if (oldFolder.renameTo(newFolder)) {
+                File renamedJsonFile = new File(newFolder, newName + ".json");
+                File movedJsonFile = new File(newFolder, oldFile.getName());
+
+                if (movedJsonFile.renameTo(renamedJsonFile)) {
+                    // Update filePath and save to update internal routeName GSON field
+                    filePath = renamedJsonFile.getAbsolutePath();
+                    FileUtils.saveRoute(this, currentRoute);
+
+                    // Refresh Title and layout data
+                    getSupportActionBar().setTitle(newName);
+                    loadRouteData();
+
+                    Toast.makeText(this, "Route reversed and renamed to: " + newName, Toast.LENGTH_LONG).show();
+                } else {
+                    saveDirectFallback(newName);
+                }
+            } else {
+                saveDirectFallback(newName);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void saveDirectFallback(String newName) throws IOException {
+        File oldFile = new File(filePath);
+
+        // Save new route (writes to newFolder / newJsonName)
+        FileUtils.saveRoute(this, currentRoute);
+
+        // Delete old json file
+        if (oldFile.exists()) {
+            oldFile.delete();
+        }
+
+        // Delete old folder if empty
+        File oldFolder = oldFile.getParentFile();
+        if (oldFolder != null && oldFolder.exists() && oldFolder.isDirectory()) {
+            File[] remainingFiles = oldFolder.listFiles();
+            if (remainingFiles == null || remainingFiles.length == 0) {
+                oldFolder.delete();
+            }
+        }
+
+        // Update filePath and refresh UI
+        File routesDir = FileUtils.getRoutesDirectory();
+        File newFolder = new File(routesDir, newName);
+        File newFile = new File(newFolder, newName + ".json");
+        filePath = newFile.getAbsolutePath();
+
+        getSupportActionBar().setTitle(newName);
+        loadRouteData();
+
+        Toast.makeText(this, "Route reversed and renamed to: " + newName, Toast.LENGTH_LONG).show();
+    }
+
+    private void deleteRecursive(File fileOrDirectory) {
+        if (fileOrDirectory.isDirectory()) {
+            File[] children = fileOrDirectory.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursive(child);
+                }
+            }
+        }
+        fileOrDirectory.delete();
     }
 
     private String getReversedRouteName(String name) {
         if (name == null) return "";
         String lower = name.toLowerCase();
 
-        // " to " pattern
+        // 1. " to " pattern (case insensitive, with spaces)
         if (lower.contains(" to ")) {
             int index = lower.indexOf(" to ");
             String part1 = name.substring(0, index).trim();
@@ -352,7 +398,15 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             return part2 + delimiter + part1;
         }
 
-        // " - " pattern
+        // 2. "to" pattern (case insensitive, word or bounded)
+        if (lower.contains("to")) {
+            int index = lower.indexOf("to");
+            String part1 = name.substring(0, index).trim();
+            String part2 = name.substring(index + 2).trim();
+            return part2 + " to " + part1;
+        }
+
+        // 3. " - " pattern
         if (name.contains(" - ")) {
             String[] parts = name.split(" - ", 2);
             if (parts.length == 2) {
@@ -360,7 +414,7 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             }
         }
 
-        // "-" pattern
+        // 4. "-" pattern
         if (name.contains("-")) {
             String[] parts = name.split("-", 2);
             if (parts.length == 2) {
