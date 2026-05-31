@@ -85,10 +85,6 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         // 4. Categorize pointsOnRoute based on movement/doubly linked list using direct distances
         java.util.List<Point> receding    = new java.util.ArrayList<>();
         java.util.List<Point> approaching = new java.util.ArrayList<>();
-        java.util.List<Point> neutral     = new java.util.ArrayList<>();
-
-        Point currUserPoint = createCurrentUserPoint(currLocation.getLatitude(), currLocation.getLongitude());
-        addCurrentUserPoint(currUserPoint);
 
         int minIndex = 0;
         if (M == 1) {
@@ -149,13 +145,10 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         // 6. Re-order the display list: Receding -> Marker -> Approaching
         // The original order of the points list should never change, only the current user placement within the list changes.
-        neutral.add(currUserPoint);
-
         java.util.List<Point> newOrder = new java.util.ArrayList<>();
         newOrder.addAll(receding);
-        newOrder.addAll(neutral);
         
-        this.userRowPosition = newOrder.size();
+        this.userRowPosition = newOrder.size(); // Injected exactly at the boundary after receding points
         newOrder.addAll(approaching);
         LogUtil.printList(newOrder, "PointAdapter.newOrder:"+newOrder.size());
 
@@ -387,19 +380,5 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             textViewStatus = itemView.findViewById(R.id.textViewCurrentStatus);
         }
     }
-    private Point createCurrentUserPoint(double lat, double lon) {
-    	Point p = new Point("----Current User----", lat, lon, "tu", null);
-        return p;
-    }
-    private void addCurrentUserPoint(Point p) {
-        Iterator<Point> iterator = this.pointsOnRoute.iterator();
-        while (iterator.hasNext()) {
-            Point p1= iterator.next();
-            if(p1.getName().equals("----Current User----")) {
-    			iterator.remove();
-    		}
-    	}
-		this.pointsOnRoute.add(p);
 
-    }
 }
