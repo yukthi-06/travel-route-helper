@@ -239,7 +239,9 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             builder.setSpan(new StyleSpan(Typeface.BOLD), startDist, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             
             int color = Color.parseColor("#4EC3D0"); // Turquoise
-            if (previousDist != -1) {
+            if (position < userRowPosition) {
+                color = Color.parseColor("#E57373"); // Red for receding points
+            } else if (previousDist != -1) {
                 double diff = currentDist - previousDist;
                 if (diff > JITTER_THRESHOLD_METERS) {
                     color = Color.parseColor("#E57373"); // Red
