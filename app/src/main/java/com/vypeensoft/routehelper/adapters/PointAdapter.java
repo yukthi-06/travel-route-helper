@@ -231,16 +231,11 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             builder.append(distanceStr);
             builder.setSpan(new StyleSpan(Typeface.BOLD), startDist, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             
-            int color = Color.parseColor("#4EC3D0"); // Turquoise
+            int color;
             if (position < userRowPosition) {
                 color = Color.parseColor("#E57373"); // Red for receding points
-            } else if (previousDist != -1) {
-                double diff = currentDist - previousDist;
-                if (diff > JITTER_THRESHOLD_METERS) {
-                    color = Color.parseColor("#E57373"); // Red
-                } else if (diff < -JITTER_THRESHOLD_METERS) {
-                    color = Color.parseColor("#81C784"); // Green
-                }
+            } else {
+                color = Color.parseColor("#81C784"); // Green for approaching points
             }
             builder.setSpan(new ForegroundColorSpan(color), startDist, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
