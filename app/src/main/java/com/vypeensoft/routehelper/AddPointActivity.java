@@ -43,6 +43,12 @@ public class AddPointActivity extends AppCompatActivity {
     private CheckBox checkboxPetrol, checkboxFood, checkboxToll, checkboxToilet;
     private CancellationTokenSource cancellationTokenSource;
 
+    private Route currentRoute;
+    private android.widget.RadioGroup radioGroupPosition;
+    private android.widget.RadioButton radioPositionEnd, radioPositionStart, radioPositionAuto;
+    private int userRowPosition = -1;
+    private Point prevPoint = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,6 +56,14 @@ public class AddPointActivity extends AppCompatActivity {
 
         filePath = getIntent().getStringExtra("FILE_PATH");
         if (filePath == null) {
+            finish();
+            return;
+        }
+
+        try {
+            currentRoute = FileUtils.loadRoute(new File(filePath));
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to load route: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -67,6 +81,11 @@ public class AddPointActivity extends AppCompatActivity {
         MaterialButton buttonSave = findViewById(R.id.buttonSave);
         MaterialButton buttonRefresh = findViewById(R.id.buttonRefreshLocation);
         buttonDelete = findViewById(R.id.buttonDelete);
+
+        radioGroupPosition = findViewById(R.id.radioGroupPosition);
+        radioPositionEnd = findViewById(R.id.radioPositionEnd);
+        radioPositionStart = findViewById(R.id.radioPositionStart);
+        radioPositionAuto = findViewById(R.id.radioPositionAuto);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -93,8 +112,29 @@ public class AddPointActivity extends AppCompatActivity {
             
             buttonDelete.setVisibility(View.VISIBLE);
             buttonDelete.setOnClickListener(v -> confirmDeletePoint());
+
+            findViewById(R.id.textViewPositionHeader).setVisibility(View.GONE);
+            radioGroupPosition.setVisibility(View.GONE);
         } else {
             requestLocation();
+            
+            userRowPosition = getIntent().getIntExtra("USER_ROW_POSITION", -1);
+            List<Point> activePoints = new ArrayList<>();
+            if (currentRoute != null && currentRoute.getPoints() != null) {
+                for (Point p : currentRoute.getPoints()) {
+                    if (!p.isDeleted()) {
+                        activePoints.add(p);
+                    }
+                }
+            }
+
+            if (userRowPosition > 0 && userRowPosition < activePoints.size()) {
+                prevPoint = activePoints.get(userRowPosition - 1);
+                Point nextPoint = activePoints.get(userRowPosition);
+                radioPositionAuto.setText("Automatically between " + prevPoint.getName() + " and " + nextPoint.getName());
+                radioPositionAuto.setVisibility(View.VISIBLE);
+                radioPositionAuto.setChecked(true);
+            }
         }
 
         buttonRefresh.setOnClickListener(v -> requestLocation());
@@ -139,18 +179,16 @@ public class AddPointActivity extends AppCompatActivity {
     }
 
     private void deletePoint() {
+        if (currentRoute == null) return;
         try {
-            File file = new File(filePath);
-            Route route = FileUtils.loadRoute(file);
-            
-            for (Point p : route.getPoints()) {
+            for (Point p : currentRoute.getPoints()) {
                 if (p.getPointId().equals(pointId)) {
                     p.setDeleted(true);
                     break;
                 }
             }
             
-            FileUtils.saveRoute(this, route);
+            FileUtils.saveRoute(this, currentRoute);
             Toast.makeText(this, R.string.point_deleted, Toast.LENGTH_SHORT).show();
             finish();
         } catch (IOException e) {
@@ -159,6 +197,7 @@ public class AddPointActivity extends AppCompatActivity {
     }
 
     private void savePoint() {
+        if (currentRoute == null) return;
         String name = editTextPointName.getText().toString().trim();
         if (name.isEmpty()) {
             Toast.makeText(this, "Please enter a name", Toast.LENGTH_SHORT).show();
@@ -177,33 +216,35 @@ public class AddPointActivity extends AppCompatActivity {
         if (checkboxToilet.isChecked()) selectedTypes.add("Toilet");
 
         try {
-            File file = new File(filePath);
-            Route route = FileUtils.loadRoute(file);
-            
             if (pointId != null) {
                 // Edit Mode: find point by ID
-                for (Point p : route.getPoints()) {
+                for (Point p : currentRoute.getPoints()) {
                     if (p.getPointId().equals(pointId)) {
-                        // Update fields
-                        // Note: We create a new Point object or update existing one.
-                        // Point model doesn't have setters for all fields currently, so let's check.
-                        // Actually, name, lat, lng are final-ish (private).
-                        // I'll replace it in the list if necessary, or better, add setters to Point.
-                        // For now, I'll find its index and replace it.
-                        int index = route.getPoints().indexOf(p);
+                        int index = currentRoute.getPoints().indexOf(p);
                         Point updatedPoint = new Point(p.getPointId(), name, p.getLatitude(), p.getLongitude(), p.getTimestamp(), selectedTypes);
-                        updatedPoint.setDeleted(false); // Ensure it's not deleted if we're saving it
-                        route.getPoints().set(index, updatedPoint);
+                        updatedPoint.setDeleted(false);
+                        currentRoute.getPoints().set(index, updatedPoint);
                         break;
                     }
                 }
             } else {
                 // Add Mode
                 Point newPoint = new Point(name, currentLat, currentLng, DateUtils.getCurrentTimestampISO(), selectedTypes);
-                route.addPoint(newPoint);
+                if (radioPositionStart.isChecked()) {
+                    currentRoute.getPoints().add(0, newPoint);
+                } else if (radioPositionAuto.isChecked() && prevPoint != null) {
+                    int mainIndex = currentRoute.getPoints().indexOf(prevPoint);
+                    if (mainIndex != -1) {
+                        currentRoute.getPoints().add(mainIndex + 1, newPoint);
+                    } else {
+                        currentRoute.addPoint(newPoint);
+                    }
+                } else {
+                    currentRoute.addPoint(newPoint);
+                }
             }
             
-            FileUtils.saveRoute(this, route);
+            FileUtils.saveRoute(this, currentRoute);
             
             Toast.makeText(this, pointId != null ? "Point updated" : "Point saved", Toast.LENGTH_SHORT).show();
             finish();

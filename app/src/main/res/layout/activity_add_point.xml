@@ -114,6 +114,49 @@
 
     </GridLayout>
 
+    <TextView
+        android:id="@+id/textViewPositionHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="Route Insertion Position:"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/gridLayoutTypes" />
+
+    <RadioGroup
+        android:id="@+id/radioGroupPosition"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textViewPositionHeader">
+
+        <RadioButton
+            android:id="@+id/radioPositionEnd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="At the End of Route"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/radioPositionStart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="At the Beginning of Route" />
+
+        <RadioButton
+            android:id="@+id/radioPositionAuto"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Automatically at Current Location Segment"
+            android:visibility="gone" />
+
+    </RadioGroup>
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonSave"
         android:layout_width="0dp"
@@ -122,7 +165,7 @@
         android:text="Save Point"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/gridLayoutTypes" />
+        app:layout_constraintTop_toBottomOf="@id/radioGroupPosition" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonDelete"

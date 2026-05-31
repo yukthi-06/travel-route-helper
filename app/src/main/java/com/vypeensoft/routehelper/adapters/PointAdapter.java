@@ -165,6 +165,10 @@ public class PointAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return -1;
     }
 
+    public int getUserRowPosition() {
+        return this.userRowPosition;
+    }
+
     public void setUserRowPosition(int position) {
         if (pointsOnRoute != null && position >= 0 && position <= pointsOnRoute.size()) {
             this.userRowPosition = position;
