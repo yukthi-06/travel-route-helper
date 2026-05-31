@@ -37,4 +37,7 @@
     <string name="btn_delete">Delete</string>
     <string name="btn_cancel">Cancel</string>
     <string name="point_deleted">Point deleted</string>
+
+    <string name="label_keep_screen_on">Keep Screen Awake</string>
+    <string name="summary_keep_screen_on">Prevent the mobile device from sleeping while the app is active.</string>
 </resources>

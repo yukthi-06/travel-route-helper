@@ -119,9 +119,18 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         startActivity(intent);
     }
 
+    private void applyKeepScreenOn() {
+        if (new com.vypeensoft.routehelper.utils.SettingsManager(this).getKeepScreenOn()) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        applyKeepScreenOn();
         loadRouteData();
         startLocationUpdates();
     }

@@ -19,4 +19,18 @@ public class AboutActivity extends AppCompatActivity {
                 BuildConfig.GIT_TAG);
         tvAppVersion.setText(versionInfo);
     }
+
+    private void applyKeepScreenOn() {
+        if (new com.vypeensoft.routehelper.utils.SettingsManager(this).getKeepScreenOn()) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyKeepScreenOn();
+    }
 }

@@ -16,6 +16,7 @@ public class SettingsManager {
 
     private static class SettingsData {
         int gpsRefreshInterval = DEFAULT_INTERVAL_MS;
+        boolean keepScreenOn = true;
     }
 
     private final File settingsFile;
@@ -68,6 +69,21 @@ public class SettingsManager {
             settingsData = new SettingsData();
         }
         settingsData.gpsRefreshInterval = intervalMs;
+        saveSettings();
+    }
+
+    public boolean getKeepScreenOn() {
+        if (settingsData == null) {
+            loadSettings();
+        }
+        return settingsData.keepScreenOn;
+    }
+
+    public void setKeepScreenOn(boolean keepOn) {
+        if (settingsData == null) {
+            settingsData = new SettingsData();
+        }
+        settingsData.keepScreenOn = keepOn;
         saveSettings();
     }
 }
