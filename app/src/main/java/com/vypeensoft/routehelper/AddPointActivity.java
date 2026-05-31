@@ -34,6 +34,7 @@ public class AddPointActivity extends AppCompatActivity {
     private String filePath;
     private String pointId = null;
     private MaterialButton buttonDelete;
+    private MaterialButton buttonAutoPlace;
     private FusedLocationProviderClient fusedLocationClient;
     private double currentLat = 0;
     private double currentLng = 0;
@@ -81,6 +82,7 @@ public class AddPointActivity extends AppCompatActivity {
         MaterialButton buttonSave = findViewById(R.id.buttonSave);
         MaterialButton buttonRefresh = findViewById(R.id.buttonRefreshLocation);
         buttonDelete = findViewById(R.id.buttonDelete);
+        buttonAutoPlace = findViewById(R.id.buttonAutoPlace);
 
         radioGroupPosition = findViewById(R.id.radioGroupPosition);
         radioPositionEnd = findViewById(R.id.radioPositionEnd);
@@ -112,6 +114,9 @@ public class AddPointActivity extends AppCompatActivity {
             
             buttonDelete.setVisibility(View.VISIBLE);
             buttonDelete.setOnClickListener(v -> confirmDeletePoint());
+
+            buttonAutoPlace.setVisibility(View.VISIBLE);
+            buttonAutoPlace.setOnClickListener(v -> autoPlacePoint());
 
             findViewById(R.id.textViewPositionHeader).setVisibility(View.GONE);
             radioGroupPosition.setVisibility(View.GONE);
@@ -265,6 +270,115 @@ public class AddPointActivity extends AppCompatActivity {
             }
         }
     }
+    private void autoPlacePoint() {
+        if (currentRoute == null || pointId == null) return;
+        String name = editTextPointName.getText().toString().trim();
+        if (name.isEmpty()) {
+            Toast.makeText(this, "Please enter a name", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> selectedTypes = new ArrayList<>();
+        if (checkboxPetrol.isChecked()) selectedTypes.add("Petrol");
+        if (checkboxFood.isChecked()) selectedTypes.add("Food");
+        if (checkboxToll.isChecked()) selectedTypes.add("Toll");
+        if (checkboxToilet.isChecked()) selectedTypes.add("Toilet");
+
+        // 1. Create the updated Point object
+        Point editedPoint = new Point(pointId, name, currentLat, currentLng, DateUtils.getCurrentTimestampISO(), selectedTypes);
+        editedPoint.setDeleted(false);
+
+        // 2. Separate currentRoute points into other active points and deleted points
+        List<Point> otherActivePoints = new ArrayList<>();
+        List<Point> deletedPoints = new ArrayList<>();
+        for (Point p : currentRoute.getPoints()) {
+            if (p.isDeleted()) {
+                deletedPoints.add(p);
+            } else if (!p.getPointId().equals(pointId)) {
+                otherActivePoints.add(p);
+            }
+        }
+
+        // 3. Find the optimal insertion index in otherActivePoints
+        int bestIndex = 0;
+        if (!otherActivePoints.isEmpty()) {
+            int N = otherActivePoints.size();
+            double minCost = Double.MAX_VALUE;
+
+            // Cost of inserting at start
+            float[] startRes = new float[1];
+            Location.distanceBetween(
+                editedPoint.getLatitude(), editedPoint.getLongitude(),
+                otherActivePoints.get(0).getLatitude(), otherActivePoints.get(0).getLongitude(),
+                startRes
+            );
+            double startCost = startRes[0];
+            if (startCost < minCost) {
+                minCost = startCost;
+                bestIndex = 0;
+            }
+
+            // Cost of inserting in the middle
+            for (int i = 1; i < N; i++) {
+                Point prev = otherActivePoints.get(i - 1);
+                Point curr = otherActivePoints.get(i);
+
+                float[] distPrevToTarget = new float[1];
+                Location.distanceBetween(prev.getLatitude(), prev.getLongitude(), editedPoint.getLatitude(), editedPoint.getLongitude(), distPrevToTarget);
+
+                float[] distTargetToCurr = new float[1];
+                Location.distanceBetween(editedPoint.getLatitude(), editedPoint.getLongitude(), curr.getLatitude(), curr.getLongitude(), distTargetToCurr);
+
+                float[] distPrevToCurr = new float[1];
+                Location.distanceBetween(prev.getLatitude(), prev.getLongitude(), curr.getLatitude(), curr.getLongitude(), distPrevToCurr);
+
+                double cost = distPrevToTarget[0] + distTargetToCurr[0] - distPrevToCurr[0];
+                if (cost < minCost) {
+                    minCost = cost;
+                    bestIndex = i;
+                }
+            }
+
+            // Cost of inserting at the end
+            float[] endRes = new float[1];
+            Location.distanceBetween(
+                otherActivePoints.get(N - 1).getLatitude(), otherActivePoints.get(N - 1).getLongitude(),
+                editedPoint.getLatitude(), editedPoint.getLongitude(),
+                endRes
+            );
+            double endCost = endRes[0];
+            if (endCost < minCost) {
+                minCost = endCost;
+                bestIndex = N;
+            }
+        }
+
+        // 4. Reconstruct the full list with updated point at bestIndex
+        List<Point> newPoints = new ArrayList<>();
+        for (int i = 0; i < otherActivePoints.size(); i++) {
+            if (i == bestIndex) {
+                newPoints.add(editedPoint);
+            }
+            newPoints.add(otherActivePoints.get(i));
+        }
+        if (bestIndex == otherActivePoints.size()) {
+            newPoints.add(editedPoint);
+        }
+        newPoints.addAll(deletedPoints);
+
+        // 5. Replace route points and save
+        currentRoute.getPoints().clear();
+        currentRoute.getPoints().addAll(newPoints);
+
+        try {
+            FileUtils.saveRoute(this, currentRoute);
+            Toast.makeText(this, "Point auto-placed successfully", Toast.LENGTH_SHORT).show();
+            finish();
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to auto-place point: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void applyKeepScreenOn() {
         if (new com.vypeensoft.routehelper.utils.SettingsManager(this).getKeepScreenOn()) {
             getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
