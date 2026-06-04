@@ -40,4 +40,7 @@
 
     <string name="label_keep_screen_on">Keep Screen Awake</string>
     <string name="summary_keep_screen_on">Prevent the mobile device from sleeping while the app is active.</string>
+
+    <string name="title_about">About Travel Route Helper</string>
+    <string name="about_description">\nThis app is a utility for helping you track your location and manage travel routes.</string>
 </resources>

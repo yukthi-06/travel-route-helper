@@ -1,8 +1,10 @@
 package com.vypeensoft.routehelper;
 
 import android.os.Bundle;
-import android.widget.TextView;
+import android.view.MenuItem;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import android.widget.TextView;
 
 public class AboutActivity extends AppCompatActivity {
     @Override
@@ -10,14 +12,31 @@ public class AboutActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_about);
 
-        TextView tvAppVersion = findViewById(R.id.tvAppVersion);
-        String versionInfo = String.format("Version: %s\nBuild: %s\nGit SHA: %s\nGit SHA Full: %s\nGit Tag: %s",
-                BuildConfig.VERSION_NAME,
-                BuildConfig.BUILD_TIMESTAMP,
-                BuildConfig.GIT_SHA,
-                BuildConfig.GIT_SHA_FULL,
-                BuildConfig.GIT_TAG);
-        tvAppVersion.setText(versionInfo);
+        String buildInfo = 
+                "Timestamp: " + BuildConfig.BUILD_TIMESTAMP + "\n" +
+                "Commit: " + BuildConfig.GIT_SHA + "\n" +
+                "Full SHA: " + BuildConfig.GIT_SHA_FULL + "\n" +
+//                "Tag: " + BuildConfig.GIT_TAG + "\n\n" +
+                getString(R.string.about_description);
+
+        TextView tvBuildInfo = findViewById(R.id.tvBuildInfo);
+        tvBuildInfo.setText(buildInfo);
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle(R.string.title_about);
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void applyKeepScreenOn() {
