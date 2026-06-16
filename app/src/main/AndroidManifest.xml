@@ -19,7 +19,9 @@
         
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:screenOrientation="fullSensor">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -29,22 +31,26 @@
         <activity
             android:name=".RouteDetailsActivity"
             android:exported="false"
-            android:label="@string/title_route_details" />
+            android:label="@string/title_route_details"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".AddPointActivity"
             android:exported="false"
-            android:label="@string/title_add_point" />
+            android:label="@string/title_add_point"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:label="@string/title_settings" />
+            android:label="@string/title_settings"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".AboutActivity"
             android:exported="false"
-            android:label="About" />
+            android:label="About"
+            android:screenOrientation="fullSensor" />
 
     </application>
 
