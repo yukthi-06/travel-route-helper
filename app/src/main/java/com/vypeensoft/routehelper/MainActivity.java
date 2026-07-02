@@ -47,6 +47,8 @@ public class MainActivity extends AppCompatActivity implements RouteAdapter.OnRo
     private TextView textViewEmptyState;
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
+    private TextView tvNoGps;
+    private android.content.BroadcastReceiver gpsReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +57,9 @@ public class MainActivity extends AppCompatActivity implements RouteAdapter.OnRo
 
         recyclerView = findViewById(R.id.recyclerViewRoutes);
         textViewEmptyState = findViewById(R.id.textViewEmptyState);
+        tvNoGps = findViewById(R.id.tv_no_gps);
+        checkInitialGpsState();
+        setupGpsListener();
         FloatingActionButton fab = findViewById(R.id.fabAddRoute);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -343,5 +348,39 @@ public class MainActivity extends AppCompatActivity implements RouteAdapter.OnRo
         super.onResume();
         applyKeepScreenOn();
         loadRoutes();
+    }
+
+    private void checkInitialGpsState() {
+        android.location.LocationManager locationManager = (android.location.LocationManager) getSystemService(android.content.Context.LOCATION_SERVICE);
+        if (locationManager != null) {
+            boolean isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+            boolean isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            tvNoGps.setVisibility((isGpsEnabled || isNetworkEnabled) ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
+    }
+
+    private void setupGpsListener() {
+        gpsReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context context, android.content.Intent intent) {
+                if (android.location.LocationManager.PROVIDERS_CHANGED_ACTION.equals(intent.getAction())) {
+                    checkInitialGpsState();
+                }
+            }
+        };
+        android.content.IntentFilter filter = new android.content.IntentFilter(android.location.LocationManager.PROVIDERS_CHANGED_ACTION);
+        registerReceiver(gpsReceiver, filter);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (gpsReceiver != null) {
+            try {
+                unregisterReceiver(gpsReceiver);
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
     }
 }
