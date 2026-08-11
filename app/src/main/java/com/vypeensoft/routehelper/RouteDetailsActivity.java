@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.widget.TextView;
 
 public class RouteDetailsActivity extends AppCompatActivity implements PointAdapter.OnPointClickListener {
 
@@ -46,6 +47,8 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
     private FloatingActionButton fabAddPoint;
     private android.view.Menu optionsMenu;
     private Set<String> selectedFilters = new HashSet<>();
+    private TextView tvNoGps;
+    private android.content.BroadcastReceiver gpsReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +60,10 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             finish();
             return;
         }
+
+        tvNoGps = findViewById(R.id.tv_no_gps);
+        checkInitialGpsState();
+        setupGpsListener();
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -496,5 +503,39 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         }
 
         return name + " (Reversed)";
+    }
+
+    private void checkInitialGpsState() {
+        android.location.LocationManager locationManager = (android.location.LocationManager) getSystemService(android.content.Context.LOCATION_SERVICE);
+        if (locationManager != null) {
+            boolean isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+            boolean isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            tvNoGps.setVisibility((isGpsEnabled || isNetworkEnabled) ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
+    }
+
+    private void setupGpsListener() {
+        gpsReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context context, android.content.Intent intent) {
+                if (android.location.LocationManager.PROVIDERS_CHANGED_ACTION.equals(intent.getAction())) {
+                    checkInitialGpsState();
+                }
+            }
+        };
+        android.content.IntentFilter filter = new android.content.IntentFilter(android.location.LocationManager.PROVIDERS_CHANGED_ACTION);
+        registerReceiver(gpsReceiver, filter);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (gpsReceiver != null) {
+            try {
+                unregisterReceiver(gpsReceiver);
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
     }
 }
