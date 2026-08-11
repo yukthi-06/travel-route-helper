@@ -29,7 +29,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 
 public class RouteDetailsActivity extends AppCompatActivity implements PointAdapter.OnPointClickListener {
 
@@ -41,6 +45,7 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
     private LocationCallback locationCallback;
     private FloatingActionButton fabAddPoint;
     private android.view.Menu optionsMenu;
+    private Set<String> selectedFilters = new HashSet<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,7 +123,20 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             displayedPoints.clear();
             for (Point p : currentRoute.getPoints()) {
                 if (!p.isDeleted()) {
-                    displayedPoints.add(p);
+                    if (selectedFilters.isEmpty()) {
+                        displayedPoints.add(p);
+                    } else {
+                        boolean match = false;
+                        for (String type : p.getTypes()) {
+                            if (selectedFilters.contains(type)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            displayedPoints.add(p);
+                        }
+                    }
                 }
             }
 
@@ -207,6 +225,7 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
         if (optionsMenu != null) {
             optionsMenu.findItem(R.id.action_edit).setVisible(!editMode);
             optionsMenu.findItem(R.id.action_reverse).setVisible(!editMode);
+            optionsMenu.findItem(R.id.action_filter).setVisible(!editMode);
             optionsMenu.findItem(R.id.action_done).setVisible(editMode);
             optionsMenu.findItem(R.id.action_cancel).setVisible(editMode);
         }
@@ -238,12 +257,24 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
     public boolean onCreateOptionsMenu(android.view.Menu menu) {
         getMenuInflater().inflate(R.menu.menu_route_details, menu);
         this.optionsMenu = menu;
+        return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(android.view.Menu menu) {
         boolean isEdit = adapter != null && adapter.isEditMode();
         menu.findItem(R.id.action_edit).setVisible(!isEdit);
         menu.findItem(R.id.action_reverse).setVisible(!isEdit);
+        android.view.MenuItem filterItem = menu.findItem(R.id.action_filter);
+        filterItem.setVisible(!isEdit);
+        if (!selectedFilters.isEmpty()) {
+            filterItem.setIcon(R.drawable.ic_filter_active);
+        } else {
+            filterItem.setIcon(R.drawable.ic_filter);
+        }
         menu.findItem(R.id.action_done).setVisible(isEdit);
         menu.findItem(R.id.action_cancel).setVisible(isEdit);
-        return true;
+        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
@@ -264,8 +295,50 @@ public class RouteDetailsActivity extends AppCompatActivity implements PointAdap
             updateEditModeUI(false);
             loadRouteData();
             return true;
+        } else if (id == R.id.action_filter) {
+            showFilterDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showFilterDialog() {
+        String[] filterOptions = {"Food", "Toll", "Petrol", "Toilet"};
+        boolean[] checkedItems = new boolean[filterOptions.length];
+        
+        for (int i = 0; i < filterOptions.length; i++) {
+            checkedItems[i] = selectedFilters.contains(filterOptions[i]);
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Filter Points");
+        builder.setMultiChoiceItems(filterOptions, checkedItems, new DialogInterface.OnMultiChoiceClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+                if (isChecked) {
+                    selectedFilters.add(filterOptions[which]);
+                } else {
+                    selectedFilters.remove(filterOptions[which]);
+                }
+            }
+        });
+
+        builder.setPositiveButton("Apply", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                loadRouteData();
+                invalidateOptionsMenu();
+            }
+        });
+        builder.setNegativeButton("Clear", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                selectedFilters.clear();
+                loadRouteData();
+                invalidateOptionsMenu();
+            }
+        });
+        builder.show();
     }
 
     @Override
